@@ -13,7 +13,7 @@ The branch follows the condition’s actual `If.this` child, keeping THEN/ELSE v
 - Added `TestOptimizer.test_unnest_case_when_where`: 64 condition/subquery cases and 3 protected grouped/aggregate/ON shapes.
 - Pure-Python upstream suite: **1727 tests, 61 skips, exit 0** with `SKIP_INTEGRATION=1`. Actual compiled-extension execution was outside this run.
 
-A broader local prototype placed `SUM(a.id)` in JOIN ON (SQLite/DuckDB errors) and a join marker in an ungrouped projection (DuckDB error). Removing the CASE-in-ON guard reduced a 12-row fixture to 2 rows. Those results motivated the WHERE-only change.
+A broader local prototype placed `SUM(a.id)` in JOIN ON (SQLite/DuckDB errors) and an unaggregated join marker in a grouped projection (DuckDB error). Removing the CASE-in-ON guard reduced a 12-row fixture to 2 rows. Those results motivated the WHERE-only change.
 
 QuestDB **10.2.0 / bundled JDK 25.0.2** was also exercised on 13 synthetic LONG input rows. The supplied HAVING form fails before CASE evaluation (`Invalid column: HAVING`); its legacy and candidate forms also fail parsing. The reporter’s QuestDB build and preceding HAVING lowering are the next native acceptance inputs.
 
