@@ -6,6 +6,10 @@ Base: `eb11aec4be8cb2122afe713a4816662c3f0fb2fa`. This branch widens the uncorre
 
 The branch follows the condition’s actual `If.this` child, keeping THEN/ELSE values, simple CASE, NOT, COALESCE, IS NULL and comparisons to FALSE protected. SELECT/HAVING/ORDER and ON retain the previous behavior. Projection/group support requires post-aggregation handling; ON hoisting must preserve ELSE rows.
 
+## Upstream outcome — 18 November 2026
+
+georgesittas merged [PR #9193](https://github.com/tobymao/sqlglot/pull/9193), restoring this WHERE-only searched-CASE membership path and closing #9190. The upstream change includes the reported query and nine focused cases. Its maintainer reports passing Python/compiled focused tests, lint and type checks. This branch records Blucca’s independent native study and proposal; the upstream implementation and focused tests are by georgesittas.
+
 ## Native checks
 
 - SQLite 3.45.1 and DuckDB 2.0.0: **144 row-multiset/AST checks** over 18 shapes and mixed-NULL, NULL-only, empty and non-NULL subqueries, preserving duplicate outer rows.
