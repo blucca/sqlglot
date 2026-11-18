@@ -2341,6 +2341,46 @@ SELECT :with_,WITH :expressions,CTE :this,UNION :this,SELECT :expressions,1,:exp
     def test_unnest_subqueries(self):
         self.check_file("unnest_subqueries", optimizer.unnest_subqueries.unnest_subqueries)
 
+    def test_unnest_case_when_where(self):
+        for where in ("", " WHERE y.b IS NOT NULL", " WHERE y.b IS NULL", " WHERE FALSE"):
+            for operator, membership in (("IN", exp.In), ("= ANY", exp.Any)):
+                predicate = f"x.a {operator} (SELECT y.b FROM y{where})"
+                for condition, unnested in (
+                    (predicate, True),
+                    (f"(({predicate}))", True),
+                    (f"({predicate}) AND x.a > 1", True),
+                    (f"({predicate}) OR x.a = 1", True),
+                    (f"NOT ({predicate})", False),
+                    (f"COALESCE(({predicate}), TRUE)", False),
+                    (f"({predicate}) IS NULL", False),
+                    (f"({predicate}) = FALSE", False),
+                ):
+                    sql = f"SELECT x.a FROM x WHERE CASE WHEN {condition} THEN 1 ELSE 0 END = 1"
+                    with self.subTest(sql=sql):
+                        qualified = optimizer.qualify.qualify(parse_one(sql), schema=self.schema)
+                        rewritten = optimizer.unnest_subqueries.unnest_subqueries(qualified)
+                        self.assertEqual(rewritten.find(membership) is None, unnested)
+                        self.assertCountEqual(
+                            self.conn.execute(rewritten.sql("duckdb")).fetchall(),
+                            self.conn.execute(sql).fetchall(),
+                        )
+
+        predicate = "x.a IN (SELECT y.b FROM y)"
+        for sql in (
+            f"SELECT x.a, CASE WHEN {predicate} THEN 1 ELSE 0 END AS r FROM x GROUP BY x.a",
+            "SELECT CASE WHEN SUM(x.a) IN (SELECT y.b FROM y) THEN 1 ELSE 0 END AS r FROM x",
+            "SELECT x.a, x2.a FROM x JOIN x AS x2 ON "
+            f"CASE WHEN {predicate} THEN TRUE ELSE TRUE END",
+        ):
+            with self.subTest(sql=sql):
+                qualified = optimizer.qualify.qualify(parse_one(sql), schema=self.schema)
+                rewritten = optimizer.unnest_subqueries.unnest_subqueries(qualified)
+                self.assertIsNotNone(rewritten.find(exp.In))
+                self.assertCountEqual(
+                    self.conn.execute(rewritten.sql("duckdb")).fetchall(),
+                    self.conn.execute(sql).fetchall(),
+                )
+
     def test_optimize_scalar_subquery_predicates(self):
         schema = {"x": {"id": "INT", "ref": "INT"}, "y": {"id": "INT", "val": "INT"}}
         with duckdb.connect() as connection:

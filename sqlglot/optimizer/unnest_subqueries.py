@@ -164,14 +164,28 @@ def unnest(select, parent_select, next_alias_name):
         if not isinstance(predicate, exp.EQ) or parent_select is not predicate.parent_select:
             return
 
-    # The join's non-NULL check maps UNKNOWN to FALSE, which is only safe in AND/OR filters.
+    # The join's non-NULL check maps UNKNOWN to FALSE. Filters and searched CASE WHEN
+    # conditions observe only TRUE, including through positive AND/OR expressions.
+    child = predicate
     ancestor = predicate.parent
     while isinstance(ancestor, (exp.And, exp.Or, exp.Paren)):
         # Moving a predicate from ON to WHERE is only safe for an inner-join conjunct.
         if isinstance(ancestor, exp.Or) and isinstance(clause, exp.Join):
             return
+        child = ancestor
         ancestor = ancestor.parent
-    if not isinstance(ancestor, (exp.Where, exp.Join)) or ancestor is not clause:
+
+    case_condition = (
+        isinstance(ancestor, exp.If)
+        and ancestor.this is child
+        and isinstance(ancestor.parent, exp.Case)
+        and ancestor.parent.this is None
+    )
+    if case_condition:
+        # Widen WHERE only: ON must keep ELSE rows and projections can be post-aggregate.
+        if not isinstance(clause, exp.Where):
+            return
+    elif not isinstance(ancestor, (exp.Where, exp.Join)) or ancestor is not clause:
         return
 
     if isinstance(clause, exp.Join):
